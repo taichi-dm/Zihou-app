@@ -3,7 +3,7 @@ import UserNotifications
 import os.log
 
 @Observable final class WorkTimeNotifier {
-    var isWorking = false
+    @MainActor var isWorking = false
 
     private let notificationCenter = UNUserNotificationCenter.current()
 
@@ -16,15 +16,19 @@ import os.log
     }
 
     func startWork() {
-        isWorking = true
         Task.detached {
+            await MainActor.run {
+                self.isWorking = true
+            }
             try await self.requestAuthorizationIfNeeded()
             try await self.scheduleNotifications()
         }
     }
 
     func endWork() {
-        isWorking = false
+        Task { @MainActor in
+            isWorking = false
+        }
         cancelNotifications()
     }
 
@@ -41,7 +45,6 @@ import os.log
             }
         case .notDetermined:
             let options: UNAuthorizationOptions = [.alert, .badge, .sound]
-
             let granted = try await notificationCenter.requestAuthorization(options: options)
 
             guard granted else {
@@ -61,10 +64,9 @@ import os.log
         let calendar = Calendar.current
         let now = Date()
 
-        // 8時間分の通知をスケジュール
         for hour in 1...8 {
             let content = UNMutableNotificationContent()
-            content.title = "時報"
+            content.title = "Zihou"
             content.body = "⌛️ \(hour)時間が経過しました。散歩して身体を動かしましょう"
             content.sound = .default
 

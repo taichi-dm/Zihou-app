@@ -73,6 +73,7 @@ import os.log
 
     private func cancelNotifications() {
         notificationCenter.removeAllPendingNotificationRequests()
+        notificationCenter.removeAllDeliveredNotifications()
     }
 }
 

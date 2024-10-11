@@ -11,38 +11,14 @@ import os.log
 
     init() {
         Task {
-            let status = await notificationCenter.notificationSettings()
-
-            switch status.authorizationStatus {
-            case .authorized, .provisional:
-                logger.info("通知の許可が得られています。")
-            case .denied:
-                logger.info("通知を拒否されています。設定アプリに遷移します。")
-                if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
-                    await UIApplication.shared.open(url)
-                }
-            case .notDetermined:
-                let options: UNAuthorizationOptions = [.alert, .badge, .sound]
-
-                let granted = try await notificationCenter.requestAuthorization(options: options)
-
-                guard granted else {
-                    logger.error("通知の許可が得られませんでした")
-                    return
-                }
-
-                logger.info("通知の許諾が取れました。")
-            case .ephemeral:
-                logger.info("App Clip用の通知が取れています")
-            @unknown default:
-                logger.error("実装のアップデートが必要です。")
-            }
+            try await requestAuthorizationIfNeeded()
         }
     }
 
     func startWork() {
         isWorking = true
         Task.detached {
+            try await self.requestAuthorizationIfNeeded()
             try await self.scheduleNotifications()
         }
     }
@@ -50,6 +26,35 @@ import os.log
     func endWork() {
         isWorking = false
         cancelNotifications()
+    }
+
+    private func requestAuthorizationIfNeeded() async throws {
+        let status = await notificationCenter.notificationSettings()
+
+        switch status.authorizationStatus {
+        case .authorized, .provisional:
+            logger.info("通知の許可が得られています。")
+        case .denied:
+            logger.info("通知を拒否されています。設定アプリに遷移します。")
+            if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
+                await UIApplication.shared.open(url)
+            }
+        case .notDetermined:
+            let options: UNAuthorizationOptions = [.alert, .badge, .sound]
+
+            let granted = try await notificationCenter.requestAuthorization(options: options)
+
+            guard granted else {
+                logger.error("通知の許可が得られませんでした")
+                return
+            }
+
+            logger.info("通知の許諾が取れました。")
+        case .ephemeral:
+            logger.info("App Clip用の通知許可が取れています")
+        @unknown default:
+            logger.error("実装のアップデートが必要です。")
+        }
     }
 
     private func scheduleNotifications() async throws {
